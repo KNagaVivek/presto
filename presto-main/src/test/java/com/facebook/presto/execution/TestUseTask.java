@@ -53,6 +53,7 @@ import static java.util.Collections.emptyList;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static org.testng.Assert.assertEquals;
 
+@Test(singleThreaded = true)
 public class TestUseTask
 {
     private final ExecutorService executor = newCachedThreadPool(daemonThreadsNamed("test-%s"));
