@@ -16,6 +16,7 @@ package com.facebook.presto.plugin.jdbc;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorTableMetadata;
+import com.facebook.presto.spi.ConnectorViewDefinition;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
@@ -71,7 +72,7 @@ public class TestJdbcMetadata
         BaseJdbcConfig baseConfig = new BaseJdbcConfig();
         baseConfig.setConnectionUrl("jdbc:h2:mem:test");
 
-        metadata = new JdbcMetadata(jdbcMetadataCache, database.getJdbcClient(), false, new DefaultTableLocationProvider(baseConfig));
+        metadata = new JdbcMetadata(jdbcMetadataCache, database.getJdbcClient(), false, new DefaultTableLocationProvider(baseConfig), true);
         tableHandle = metadata.getTableHandle(SESSION, new SchemaTableName("example", "numbers"));
     }
 
@@ -269,7 +270,7 @@ public class TestJdbcMetadata
         // Create BaseJdbcConfig with connection URL for drop table test
         BaseJdbcConfig dropConfig = new BaseJdbcConfig();
         dropConfig.setConnectionUrl("jdbc:h2:mem:test");
-        metadata = new JdbcMetadata(jdbcMetadataCache, database.getJdbcClient(), true, new DefaultTableLocationProvider(dropConfig));
+        metadata = new JdbcMetadata(jdbcMetadataCache, database.getJdbcClient(), true, new DefaultTableLocationProvider(dropConfig), true);
         metadata.dropTable(SESSION, tableHandle);
 
         try {
@@ -295,7 +296,7 @@ public class TestJdbcMetadata
         };
 
         // Create JdbcMetadata with the custom provider
-        JdbcMetadata customMetadata = new JdbcMetadata(jdbcMetadataCache, database.getJdbcClient(), false, customProvider);
+        JdbcMetadata customMetadata = new JdbcMetadata(jdbcMetadataCache, database.getJdbcClient(), false, customProvider, true);
 
         // Verify that the metadata can be created and basic operations work
         JdbcTableHandle customTableHandle = customMetadata.getTableHandle(SESSION, new SchemaTableName("example", "numbers"));
@@ -321,5 +322,52 @@ public class TestJdbcMetadata
                 new SchemaTableName("example", "numbers"),
                 new SchemaTableName("example", "view_source"),
                 new SchemaTableName("example", "view")));
+    }
+
+    @Test
+    public void testGetViewsWithPrestoManagedViewFalse()
+    {
+        // Create metadata with prestoManagedViewsEnabled=false
+        BaseJdbcConfig config = new BaseJdbcConfig();
+        config.setConnectionUrl("jdbc:h2:mem:test");
+        metadata = new JdbcMetadata(jdbcMetadataCache, database.getJdbcClient(), false, new DefaultTableLocationProvider(config), false);
+
+        // When prestoManagedViewsEnabled=false, getViews should delegate to jdbcMetadata.getViews() and returns empty result
+        Map<SchemaTableName, ConnectorViewDefinition> views = metadata.getViews(SESSION, new SchemaTablePrefix("example"));
+        assertEquals(views, ImmutableMap.of());
+
+        // Verify with specific table prefix
+        Map<SchemaTableName, ConnectorViewDefinition> specificView = metadata.getViews(SESSION, new SchemaTablePrefix("example", "view"));
+        assertEquals(specificView, ImmutableMap.of());
+    }
+
+    @Test
+    public void testGetViewsWithPrestoManagedViewTrue()
+    {
+        // metadata is already created with prestoManagedViewsEnabled=true in setUp()
+        // When prestoManagedViewsEnabled=true, should delegate to jdbcClient.getViews().
+        // BaseJdbcClient returns empty by default; connectors override to return actual views
+        Map<SchemaTableName, ConnectorViewDefinition> views = metadata.getViews(SESSION, new SchemaTablePrefix("example"));
+        assertEquals(views, ImmutableMap.of());
+
+        Map<SchemaTableName, ConnectorViewDefinition> specificView = metadata.getViews(SESSION, new SchemaTablePrefix("example", "view"));
+        assertEquals(specificView, ImmutableMap.of());
+    }
+
+    @Test
+    public void testPrestoManagedViewFlagInConstructor()
+    {
+        BaseJdbcConfig config = new BaseJdbcConfig();
+        config.setConnectionUrl("jdbc:h2:mem:test");
+
+        // flag=false: views are datasource-managed, returns empty directly
+        JdbcMetadata metadataFalse = new JdbcMetadata(jdbcMetadataCache, database.getJdbcClient(), false, new DefaultTableLocationProvider(config), false);
+        Map<SchemaTableName, ConnectorViewDefinition> viewsFalse = metadataFalse.getViews(SESSION, new SchemaTablePrefix("example"));
+        assertEquals(viewsFalse, ImmutableMap.of());
+
+        // flag=true: delegates to jdbcClient — BaseJdbcClient returns empty by default
+        JdbcMetadata metadataTrue = new JdbcMetadata(jdbcMetadataCache, database.getJdbcClient(), false, new DefaultTableLocationProvider(config), true);
+        Map<SchemaTableName, ConnectorViewDefinition> viewsTrue = metadataTrue.getViews(SESSION, new SchemaTablePrefix("example"));
+        assertEquals(viewsTrue, ImmutableMap.of());
     }
 }

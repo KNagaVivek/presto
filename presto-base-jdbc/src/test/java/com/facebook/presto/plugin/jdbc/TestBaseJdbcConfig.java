@@ -24,6 +24,8 @@ import java.util.Map;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 public class TestBaseJdbcConfig
@@ -41,7 +43,8 @@ public class TestBaseJdbcConfig
                 .setCaseInsensitiveNameMatchingCacheTtl(new Duration(1, MINUTES))
                 .setlistSchemasIgnoredSchemas("information_schema")
                 .setCaseSensitiveNameMatching(false)
-                .setFetchSize(20000));
+                .setFetchSize(20000)
+                .setPrestoManagedViewsEnabled(true));
     }
 
     @Test
@@ -58,6 +61,7 @@ public class TestBaseJdbcConfig
                 .put("list-schemas-ignored-schemas", "test,test2")
                 .put("case-sensitive-name-matching", "true")
                 .put("jdbc-fetch-size", "5000")
+                .put("enable-presto-managed-views", "false")
                 .build();
 
         BaseJdbcConfig expected = new BaseJdbcConfig()
@@ -70,7 +74,8 @@ public class TestBaseJdbcConfig
                 .setlistSchemasIgnoredSchemas("test,test2")
                 .setCaseInsensitiveNameMatchingCacheTtl(new Duration(1, SECONDS))
                 .setCaseSensitiveNameMatching(true)
-                .setFetchSize(5000);
+                .setFetchSize(5000)
+                .setPrestoManagedViewsEnabled(false);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }
@@ -137,6 +142,22 @@ public class TestBaseJdbcConfig
         config.setCaseSensitiveNameMatching(true);
 
         // Should not throw any exception
+        config.validateConfig();
+    }
+
+    @Test
+    public void testPrestoManagedViewProperty()
+    {
+        BaseJdbcConfig config = new BaseJdbcConfig();
+        config.setConnectionUrl("jdbc:mysql://localhost:3306/test");
+        assertTrue(config.isPrestoManagedViewsEnabled());
+
+        config.setPrestoManagedViewsEnabled(false);
+        assertFalse(config.isPrestoManagedViewsEnabled());
+
+        config.setPrestoManagedViewsEnabled(true);
+        assertTrue(config.isPrestoManagedViewsEnabled());
+
         config.validateConfig();
     }
 }
