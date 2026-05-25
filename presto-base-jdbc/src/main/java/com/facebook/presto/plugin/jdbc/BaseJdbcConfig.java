@@ -57,6 +57,7 @@ public class BaseJdbcConfig
     private boolean caseSensitiveNameMatchingEnabled;
     @Min(1)
     private int fetchSize = 20000;
+    private boolean prestoManagedViewsEnabled = true;
 
     @NotNull
     public String getConnectionUrl()
@@ -205,6 +206,22 @@ public class BaseJdbcConfig
     public BaseJdbcConfig setFetchSize(int fetchSize)
     {
         this.fetchSize = fetchSize;
+        return this;
+    }
+
+    public boolean isPrestoManagedViewsEnabled()
+    {
+        return prestoManagedViewsEnabled;
+    }
+
+    @Config("jdbc.presto-view-analysis-enabled")
+    @ConfigDescription("Enable Presto-managed handling for connector views. " +
+            "When enabled, Presto analyzes and processes underlying view SQL. " +
+            "When disabled, connector views are treated as datasource-managed " +
+            "and executed directly by the remote datasource without Presto view analysis.")
+    public BaseJdbcConfig setPrestoManagedViewsEnabled(boolean prestoManagedViewsEnabled)
+    {
+        this.prestoManagedViewsEnabled = prestoManagedViewsEnabled;
         return this;
     }
 }
